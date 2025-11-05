@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Management</title>
+    <!-- <link rel="stylesheet" href="style.css"> -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+
+    <!-- Section 1: Database Setup -->
+    <div id="db-setup-screen" class="screen active" style="text-align: center">
+        <header style="border-bottom: 2px solid black; margin: 50px 500px;">
+            <h1>Database Setup</h1>
+            <h3>Choose an existing database or create a new one.</h3>
+        </header>
+
+        <div style="display: flex; justify-content: space-around;">
+            <div id="create-db-section">
+                <h3>Create New Database</h3>
+                <input type="text" id="new-db-name" placeholder="Enter New Database Name" required>
+                <button id="create-db-btn">Create and Enter</button>
+            </div>
+
+            <div id="choose-db-section">
+                <h3>Choose Existing Database</h3>
+                <select id="existing-db-list">
+                    
+                </select>
+                <button id="choose-db-btn">Enter Database</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 2: Main Application for CRUD -->
+    <div id="main-app-screen" class="screen">
+        <header>
+            <h1 id="main-app-title">University Management System</h1>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" data-target="students">Students</button>
+            <button class="nav-btn" data-target="faculty">Faculty</button>
+            <button class="nav-btn" data-target="courses">Courses</button>
+            <button class="nav-btn" data-target="departments">Departments</button>
+        </nav>
+
+        <main>
+            <!-- Students Page -->
+            <div id="students" class="page active">
+                <h2>Manage Students</h2>
+                <form id="student-form" class="entity-form">
+                    <input type="hidden" id="student-id">
+                    <input type="text" id="student-name" placeholder="Student Name" required>
+                    <input type="email" id="student-email" placeholder="Student Email" required>
+                    <button type="submit">Add Student</button>
+                </form>
+                <table id="students-table" class="entity-table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Faculty Page -->
+            <div id="faculty" class="page">
+                <h2>Manage Faculty</h2>
+                <form id="faculty-form" class="entity-form">
+                    <input type="hidden" id="faculty-id">
+                    <input type="text" id="faculty-name" placeholder="Faculty Name" required>
+                    <input type="text" id="faculty-position" placeholder="Position" required>
+                    <button type="submit">Add Faculty</button>
+                </form>
+                <table id="faculty-table" class="entity-table">
+                    <thead><tr><th>Name</th><th>Position</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Courses Page -->
+            <div id="courses" class="page">
+                <h2>Manage Courses</h2>
+                <form id="course-form" class="entity-form">
+                    <input type="hidden" id="course-id">
+                    <input type="text" id="course-name" placeholder="Course Name" required>
+                    <input type="number" id="course-credits" placeholder="Credits" required>
+                    <button type="submit">Add Course</button>
+                </form>
+                <table id="courses-table" class="entity-table">
+                    <thead><tr><th>Name</th><th>Credits</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Departments Page -->
+            <div id="departments" class="page">
+                <h2>Manage Departments</h2>
+                <form id="department-form" class="entity-form">
+                    <input type="hidden" id="department-id">
+                    <input type="text" id="department-name" placeholder="Department Name" required>
+                    <button type="submit">Add Department</button>
+                </form>
+                <table id="departments-table" class="entity-table">
+                    <thead><tr><th>Name</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        const BACKEND_URL = "http://localhost:8000";
+        const createDbBtn = document.getElementById('create-db-btn');
+        const existingDbList = document.getElementById("existing-db-list");
+        const chooseDbBtn = document.getElementById('choose-db-btn');
+
+        createDbBtn.addEventListener('click', async () => {
+            const dbName = document.getElementById('new-db-name').value;
+            if (!dbName) {
+                alert('Please enter a database name.');
+                return;
+            }
+            currentDatabase = dbName;
+            // Yahan aap backend ko DB aur schema create karne ka request bhejenge
+            console.log(`Creating database '${dbName}' with default schemas.`);
+            try{
+                const res = await axios.post(`${BACKEND_URL}/api/createdb`, {dbName: dbName})
+                if(res.data.success){
+                    window.sessionStorage.setItem("dbName", dbName);
+                    window.location.href = "tables.html";
+                }
+            }
+            catch (error) {
+                console.log(error);
+            }
+        });
+
+        window.onload = async () => {
+            try{
+                const res = await axios.get(`${BACKEND_URL}/api/fetchdbs`);
+                if(res.data.success){
+                    res.data.databaseNames.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item;
+                        option.textContent = item;
+                        existingDbList.appendChild(option);
+                    });
+                }
+            }
+            catch (error) {
+                console.log(error);
+            }
+        }
+
+        chooseDbBtn.addEventListener('click', async () => {
+            try{
+                const res = await axios.get(`${BACKEND_URL}/api/fetchdbs`);
+                if(res.data.success){
+                    if(res.data.databaseNames.indexOf(existingDbList.value) !== -1){
+                        window.sessionStorage.setItem("dbName", existingDbList.value);
+                        window.location.href = "tables.html";
+                    }
+                }
+            }
+            catch (error) {
+                console.log(error);
+            }
+        })
+    </script>
+</body>
+</html>

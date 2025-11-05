@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tables</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <ul id="table-names">
+
+    </ul>
+
+
+    <script>
+        BACKEND_URL = "http://localhost:8000";
+        window.onload = async () => {
+            const etableNames = document.getElementById("table-names");
+            const dbName = window.sessionStorage.getItem("dbName");
+            if(dbName){
+                try{
+                    const res = await axios.post(`${BACKEND_URL}/api/fetchtnames`,  {dbName: dbName});
+                    if(res.data.success){
+                        const not_present = ["student", "faculty", "courses", "departemnt"];
+                        res.data.tableNames.forEach((item) => {
+                            if(not_present.indexOf(item) !== 1) not_present.slice(not_present.indeOf(item), 1);
+                        });
+                        window.sessionStorage.setItem("tables", JSON.stringify(not_present));
+
+                        if(res.data.tableNames.length === 0) window.location.href = "new_table.html";
+                        const h2 = document.createElement('h2');
+                        h2.textContent = 'Following are the tables in the selected database:';
+                        etableNames.appendChild(h2);
+                        res.data.tableNames.forEach((item) => {
+                            // console.log(item);
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a href="tables/${item}.html">${item}</a>`;
+                            etableNames.appendChild(li);
+                        })
+                        if(res.data.tableNames.length < 4){
+                            const p = document.createElement('p');
+                            p.innerHTML = 'Add a new non existing table <a href="new_table.html">here</a>';
+                            document.body.appendChild(p);
+                        }
+                    }
+                    else{
+                        console.log(res.data);
+                    }
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else{
+                etableNames.innerHTML = "<h2>Please first connect to a database or create one <a href='index.html'>here</a>.</h2>";
+            }
+        };
+    </script>
+</body>
+</html>
