@@ -17,21 +17,17 @@
         border-collapse: collapse;
         width: 100%;
       }
-      table,
-      th,
-      td {
+      table, th, td {
         border: 1px solid #ccc;
       }
-      th,
-      td {
+      th, td {
         padding: 8px;
         text-align: left;
       }
       .actions button {
         margin-right: 6px;
       }
-      form input,
-      form select {
+      form input, form select {
         padding: 6px;
         margin-right: 8px;
       }
@@ -52,7 +48,7 @@
       <form id="row-form">
         <div id="form-fields"></div>
         <input type="hidden" id="editing-id" />
-        <button type="submit" id="submit-btn">Add Row</button>
+        <button type="submit" id="submit-btn" style="margin-top:3px;">Add Row</button>
         <button type="button" id="cancel-btn" style="display: none">
           Cancel
         </button>
@@ -69,6 +65,7 @@
 
     <script>
       const BACKEND_URL = "http://localhost:8000";
+      let primary_field;
 
       async function showMessage(msg, isError = false) {
         const el = document.getElementById("message");
@@ -112,7 +109,7 @@
           const name = col.Field;
           const extra = col.Extra || "";
           const key = col.Key || "";
-          if (key === "PRI" && extra.includes("auto_increment")) return; // skip auto PK
+          if (key === "PRI" && extra.includes("auto_increment")){ primary_field = name; return; } // skip auto PK
           const wrapper = document.createElement("div");
           wrapper.style.display = "inline-block";
           wrapper.style.marginRight = "8px";
@@ -196,9 +193,7 @@
           return;
         }
         CURRENT_TABLE = table;
-        document.getElementById(
-          "title"
-        ).textContent = `Table: ${table} (DB: ${dbName})`;
+        document.getElementById("title").textContent = `Table: ${table} (DB: ${dbName})`;
 
         const ok = await ensureDbSelected(dbName);
         if (!ok) return;
@@ -220,12 +215,12 @@
 
       async function startEdit(row) {
         // populate inputs
-        document.getElementById("editing-id").value = row.id || "";
+        document.getElementById("editing-id").value = row[primary_field] ?? "";
         COLUMNS.forEach((col) => {
           const name = col.Field;
           const key = col.Key || "";
           const extra = col.Extra || "";
-          if (key === "PRI" && extra.includes("auto_increment")) return; // skipped field
+          if (key === "PRI" && extra.includes("auto_increment")){ primary_field = name; return; } // skipped field
           const input = document.getElementById(`field-${name}`);
           if (input) input.value = row[name] ?? "";
         });
@@ -248,7 +243,7 @@
       }
 
       async function deleteRow(row) {
-        const id = row.id;
+        const id = row[primary_field];
         if (id === undefined) {
           showMessage("No id column found for this row; cannot delete", true);
           return;
@@ -257,7 +252,7 @@
         try {
           await axios.delete(
             `${BACKEND_URL}/api/rows/${encodeURIComponent(id)}`,
-            { params: { table: CURRENT_TABLE } }
+            { params: { table: CURRENT_TABLE, pk: primary_field } }
           );
           showMessage("Row deleted");
           await refreshRows();
@@ -275,7 +270,7 @@
           const name = col.Field;
           const key = col.Key || "";
           const extra = col.Extra || "";
-          if (key === "PRI" && extra.includes("auto_increment")) return;
+          if (key === "PRI" && extra.includes("auto_increment")) { primary_field = name; return; };
           const input = document.getElementById(`field-${name}`);
           if (!input) return;
           let val = input.value;
@@ -286,7 +281,7 @@
           if (editingId) {
             await axios.put(
               `${BACKEND_URL}/api/rows/${encodeURIComponent(editingId)}`,
-              { table: CURRENT_TABLE, data }
+              { table: CURRENT_TABLE, data, pk: primary_field }
             );
             showMessage("Row updated");
           } else {
