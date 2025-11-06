@@ -51,6 +51,18 @@ app.get('/api/fetchdbs', (req, res) => {
     });
 });
 
+app.post('/api/usedb', (req, res) => {
+    const { dbName } = req.body;
+    connection.query(`USE ${dbName}`, (err, results) => {
+        if (err) {
+            console.error('Error executing query:', err);
+            res.status(500).send('Error connecting to database');
+            return;
+        }
+        res.json({ success: true });
+    });
+})
+
 app.post('/api/fetchtnames', (req, res) => {
     const { dbName } = req.body;
     if (!dbName || typeof dbName !== 'string') {
@@ -70,7 +82,67 @@ app.post('/api/fetchtnames', (req, res) => {
             return;
         }
         const tableNames = results.map(row => row.table_name);
-        res.json({ tableNames, success: true });
+        (async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/usedb', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dbName }),
+                });
+                const remoteResult = await response.json().catch(() => null);
+                res.json({ tableNames, success: remoteResult.success });
+            } catch (err) {
+                console.error('Error calling downstream API:', err);
+                res.json({ tableNames, success: false, apiError: String(err) });
+            }
+        })();
+        // res.json({ tableNames, success: true });
+    });
+});
+
+app.post('/api/createtable', (req, res) => {
+    const {tName, fields} = req.body;
+    if (!tName || typeof tName !== 'string') {
+        res.status(400).send('Invalid database name');
+        return;
+    }
+    if (!Array.isArray(fields) || fields.length === 0) {
+        res.status(400).send('Invalid fields array');
+        return;
+    }
+
+    // helper to safely escape qualified identifiers like "db.table" or "db.table.column"
+    const escapeQualifiedId = (ident) => {
+        if (typeof ident !== 'string') return '';
+        const parts = ident.split('.');
+        return parts.map(p => mysql.escapeId(p)).join('.');
+    };
+
+    const columnDefinitions = fields.map((field) => {
+        if (typeof field === 'string') {
+            return field;
+        }
+        const name = escapeQualifiedId(field.name);
+        const type = field.type ? String(field.type) : 'VARCHAR(255)';
+        // const nullable = field.nullable === false ? 'NOT NULL' : '';
+        // const autoInc = field.autoIncrement ? 'AUTO_INCREMENT' : '';
+        // const primary = field.primary ? 'PRIMARY KEY' : '';
+        // const defaultClause = field.default !== undefined ? 'DEFAULT ' + mysql.escape(field.default) : '';
+
+        return [name, type].filter(Boolean).join(' ').trim();
+    }).join(', ');
+
+    const query = `CREATE TABLE ${escapeQualifiedId(tName)} (
+        ${columnDefinitions}
+    )`;
+
+    connection.query(query, (err, results) => {
+        if (err) {
+            console.error('Error creating table:', err);
+            res.status(500).send('Error creating table');
+            return;
+        }
+        res.json({ results, success: true });
     });
 });
 

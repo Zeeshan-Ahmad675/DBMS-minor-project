@@ -18,7 +18,7 @@
         </div>
 
         <div id="schema-controls">
-            <p>Define up to 10 fields (min 2). For each field enter a title and choose a type.</p>
+            <p>Define up to 10 fields (min 2). For each field enter a title and choose its data type.</p>
 
             <div id="schema-list">
                 <!-- two initial required rows -->
@@ -76,148 +76,171 @@
 
 
     <script>
-    (function(){
-        const MAX_FIELDS = 10;
-        const MIN_FIELDS = 2;
+        BACKEND_URL = "http://localhost:8000";
+        (function(){
+            const MAX_FIELDS = 10;
+            const MIN_FIELDS = 2;
 
-        const etableNames = document.getElementById("tableNames");
-        const schemaList = document.getElementById('schema-list');
-        const addBtn = document.getElementById('add-schema-btn');
-        const counter = document.getElementById('schema-counter');
-        const createTableBtn = document.getElementById('create-table-btn');
+            const etableNames = document.getElementById("tableNames");
+            const schemaList = document.getElementById('schema-list');
+            const addBtn = document.getElementById('add-schema-btn');
+            const counter = document.getElementById('schema-counter');
+            const createTableBtn = document.getElementById('create-table-btn');
 
-        const dbName = window.sessionStorage.getItem("dbName");
-        const tableNames = JSON.parse(window.sessionStorage.getItem("tables"));
+            const dbName = window.sessionStorage.getItem("dbName");
+            const tableNames = JSON.parse(window.sessionStorage.getItem("tables"));
 
-        function updateUI() {
-            const rows = schemaList.querySelectorAll('.schema-row');
-            counter.textContent = rows.length + ' / ' + MAX_FIELDS;
-            // disable add at limit
-            addBtn.disabled = rows.length >= MAX_FIELDS;
-            // disable remove buttons if at min
-            rows.forEach(btnRow => {
-                const rem = btnRow.querySelector('.remove-schema');
-                rem.disabled = rows.length <= MIN_FIELDS;
-            });
-        }
-
-        function createRow(title = '', type = 'text') {
-            const row = document.createElement('div');
-            row.className = 'schema-row';
-
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.name = 'schema_titles[]';
-            input.className = 'schema-title';
-            input.placeholder = 'Field title';
-            input.required = true;
-            input.value = title;
-
-            const select = document.createElement('select');
-            select.name = 'schema_types[]';
-            select.className = 'schema-type';
-            select.required = true;
-            const types = [
-                ['varchar(50)','VARCHAR(50)'],
-                ['text','TEXT'],
-                ['int(11)','INT(11)'],
-                ['bigint(20)','BIGINT(20)'],
-                ['float(8,2)','FLOAT(8,2)'],
-                ['double(10,2)','DOUBLE(10,2)'],
-                ['decimal(10,2)','DECIMAL(10,2)'],
-                ['date','DATE'],
-                ['datetime','DATETIME'],
-                ['timestamp','TIMESTAMP'],
-                ['tinyint(1)','TINYINT(1) (BOOLEAN)'],
-                ['blob','BLOB'],
-                ["enum('val1','val2')","ENUM('val1','val2')"]
-            ];
-            types.forEach(([val,label]) => {
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.textContent = label;
-                if (val === type) opt.selected = true;
-                select.appendChild(opt);
-            });
-
-            const remBtn = document.createElement('button');
-            remBtn.type = 'button';
-            remBtn.className = 'remove-schema';
-            remBtn.title = 'Remove field';
-            remBtn.setAttribute('aria-label','Remove field');
-            remBtn.textContent = '−';
-            remBtn.addEventListener('click', () => {
-                if (schemaList.querySelectorAll('.schema-row').length > MIN_FIELDS) {
-                    row.remove();
-                    updateUI();
-                }
-            });
-
-            row.appendChild(input);
-            row.appendChild(select);
-            row.appendChild(remBtn);
-            return row;
-        }
-
-        addBtn.addEventListener('click', () => {
-            const count = schemaList.querySelectorAll('.schema-row').length;
-            if (count < MAX_FIELDS) {
-                schemaList.appendChild(createRow());
-                updateUI();
-                // focus newly added title
-                const last = schemaList.querySelectorAll('.schema-row');
-                last[last.length - 1].querySelector('.schema-title').focus();
-            }
-        });
-
-        // delegate remove clicks (in case rows added via other means)
-        schemaList.addEventListener('click', (e) => {
-            if (e.target && e.target.classList.contains('remove-schema')) {
+            function updateUI() {
                 const rows = schemaList.querySelectorAll('.schema-row');
-                if (rows.length > MIN_FIELDS) {
-                    e.target.closest('.schema-row').remove();
-                    updateUI();
-                }
+                counter.textContent = rows.length + ' / ' + MAX_FIELDS;
+                // disable add at limit
+                addBtn.disabled = rows.length >= MAX_FIELDS;
+                // disable remove buttons if at min
+                rows.forEach(btnRow => {
+                    const rem = btnRow.querySelector('.remove-schema');
+                    rem.disabled = rows.length <= MIN_FIELDS;
+                });
             }
-        });
 
-        document.querySelectorAll('#schema-list .schema-row').forEach(row => {
-            const rem = row.querySelector('.remove-schema');
-            if (rem) {
-                rem.addEventListener('click', () => {
+            function createRow(title = '', type = 'text') {
+                const row = document.createElement('div');
+                row.className = 'schema-row';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.name = 'schema_titles[]';
+                input.className = 'schema-title';
+                input.placeholder = 'Field title';
+                input.required = true;
+                input.value = title;
+
+                const select = document.createElement('select');
+                select.name = 'schema_types[]';
+                select.className = 'schema-type';
+                select.required = true;
+                const types = [
+                    ['varchar(50)','VARCHAR(50)'],
+                    ['text','TEXT'],
+                    ['int(11)','INT(11)'],
+                    ['bigint(20)','BIGINT(20)'],
+                    ['float(8,2)','FLOAT(8,2)'],
+                    ['double(10,2)','DOUBLE(10,2)'],
+                    ['decimal(10,2)','DECIMAL(10,2)'],
+                    ['date','DATE'],
+                    ['datetime','DATETIME'],
+                    ['timestamp','TIMESTAMP'],
+                    ['tinyint(1)','TINYINT(1) (BOOLEAN)'],
+                    ['blob','BLOB'],
+                    ["enum('val1','val2')","ENUM('val1','val2')"]
+                ];
+                types.forEach(([val,label]) => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = label;
+                    if (val === type) opt.selected = true;
+                    select.appendChild(opt);
+                });
+
+                const remBtn = document.createElement('button');
+                remBtn.type = 'button';
+                remBtn.className = 'remove-schema';
+                remBtn.title = 'Remove field';
+                remBtn.setAttribute('aria-label','Remove field');
+                remBtn.textContent = '−';
+                remBtn.addEventListener('click', () => {
                     if (schemaList.querySelectorAll('.schema-row').length > MIN_FIELDS) {
                         row.remove();
                         updateUI();
                     }
                 });
+
+                row.appendChild(input);
+                row.appendChild(select);
+                row.appendChild(remBtn);
+                return row;
             }
-        });
 
-
-        window.onload = async () => {
-            if(dbName && tableNames){
-                tableNames.forEach((item) => {
-                    const option = document.createElement("option");
-                    option.textContent = item;
-                    option.value = item;
-                    etableNames.appendChild(option);
-                })
-            }
-            else window.location.href = "index.html";
-        }
-
-        if (createTableBtn) {
-            createTableBtn.addEventListener('click', (e) => {
-                const rows = schemaList.querySelectorAll('.schema-row');
-                if (rows.length < MIN_FIELDS) {
-                    e.preventDefault();
-                    alert('Please define at least ' + MIN_FIELDS + ' fields.');
+            addBtn.addEventListener('click', () => {
+                const count = schemaList.querySelectorAll('.schema-row').length;
+                if (count < MAX_FIELDS) {
+                    schemaList.appendChild(createRow());
+                    updateUI();
+                    // focus newly added title
+                    const last = schemaList.querySelectorAll('.schema-row');
+                    last[last.length - 1].querySelector('.schema-title').focus();
                 }
-                // all individual inputs are required so browser will enforce titles/types presence
             });
-        }
-        updateUI();
-    })();
+
+            // delegate remove clicks (in case rows added via other means)
+            schemaList.addEventListener('click', (e) => {
+                if (e.target && e.target.classList.contains('remove-schema')) {
+                    const rows = schemaList.querySelectorAll('.schema-row');
+                    if (rows.length > MIN_FIELDS) {
+                        e.target.closest('.schema-row').remove();
+                        updateUI();
+                    }
+                }
+            });
+
+            document.querySelectorAll('#schema-list .schema-row').forEach(row => {
+                const rem = row.querySelector('.remove-schema');
+                if (rem) {
+                    rem.addEventListener('click', () => {
+                        if (schemaList.querySelectorAll('.schema-row').length > MIN_FIELDS) {
+                            row.remove();
+                            updateUI();
+                        }
+                    });
+                }
+            });
+
+
+            window.onload = async () => {
+                if(dbName && tableNames){
+                    tableNames.forEach((item) => {
+                        const option = document.createElement("option");
+                        option.textContent = item;
+                        option.value = item;
+                        etableNames.appendChild(option);
+                    })
+                }
+                else window.location.href = "index.html";
+            }
+
+            if (createTableBtn) {
+                createTableBtn.addEventListener('click', async (e) => {
+                    const rows = schemaList.querySelectorAll('.schema-row');
+                    if (rows.length < MIN_FIELDS) {
+                        e.preventDefault();
+                        alert('Please define at least ' + MIN_FIELDS + ' fields.');
+                        return;
+                    }
+                    let fields = [];
+                    for (let i = 0; i < rows.length; i++) {
+                        const input = rows[i].querySelector('.schema-title');
+                        const type = rows[i].querySelector('.schema-type');
+                        if (!input || input.value.trim() === '') {
+                            e.preventDefault();
+                            alert('Field ' + (i + 1) + ' title cannot be empty.');
+                            if (input) input.focus();
+                            return;
+                        }
+                        else fields.push({ name: input.value.trim(), type: type.value });
+                    }
+                    const tName = etableNames.value;
+                    try{
+                        const res = await axios.post(`${BACKEND_URL}/api/createtable`, { tName: tName, fields: fields });
+                        if(res.data.success){
+                            window.location.href = "tables.html";
+                        }
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                });
+            }
+            updateUI();
+        })();
     </script>
 </body>
 </html>
