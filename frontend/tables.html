@@ -23,7 +23,7 @@
                     if(res.data.success){
                         const not_present = ["student", "faculty", "courses", "departemnt"];
                         res.data.tableNames.forEach((item) => {
-                            if(not_present.indexOf(item) !== 1) not_present.slice(not_present.indeOf(item), 1);
+                            if(not_present.indexOf(item) !== 1) not_present.slice(not_present.indexOf(item), 1);
                         });
                         window.sessionStorage.setItem("tables", JSON.stringify(not_present));
 
