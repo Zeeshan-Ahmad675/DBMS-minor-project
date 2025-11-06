@@ -21,20 +21,22 @@
                 try{
                     const res = await axios.post(`${BACKEND_URL}/api/fetchtnames`,  {dbName: dbName});
                     if(res.data.success){
-                        const not_present = ["student", "faculty", "courses", "departemnt"];
+                        const not_present = ["student", "faculty", "courses", "department"];
                         res.data.tableNames.forEach((item) => {
-                            if(not_present.indexOf(item) !== 1) not_present.slice(not_present.indexOf(item), 1);
+                            const idx = not_present.indexOf(item);
+                            if (idx !== -1) not_present.splice(idx, 1);
                         });
                         window.sessionStorage.setItem("tables", JSON.stringify(not_present));
 
                         if(res.data.tableNames.length === 0) window.location.href = "new_table.html";
                         const h2 = document.createElement('h2');
-                        h2.textContent = 'Following are the tables in the selected database:';
+                        h2.innerHTML = `Following are the tables in <b>${dbName}</b>:`;
+                        h2.style.fontWeight = "normal";
                         etableNames.appendChild(h2);
                         res.data.tableNames.forEach((item) => {
                             // console.log(item);
                             const li = document.createElement('li');
-                            li.innerHTML = `<a href="tables/${item}.html">${item}</a>`;
+                            li.innerHTML = `<a href="table_data.html" class="tables">${item}</a>`;
                             etableNames.appendChild(li);
                         })
                         if(res.data.tableNames.length < 4){
@@ -55,6 +57,15 @@
                 etableNames.innerHTML = "<h2>Please first connect to a database or create one <a href='index.html'>here</a>.</h2>";
             }
         };
+
+        document.getElementById('table-names').addEventListener('click', (e) => {
+            const a = e.target.closest('a.tables');
+            if (!a) return;
+            e.preventDefault();
+            const tableName = a.textContent.trim();
+            window.sessionStorage.setItem('current_table', tableName);
+            window.location.href = 'table_data.html';
+        });
     </script>
 </body>
 </html>
