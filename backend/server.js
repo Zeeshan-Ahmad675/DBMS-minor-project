@@ -151,3 +151,111 @@ const port = 8000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
+
+// Get columns for a table
+app.get('/api/columns', (req, res) => {
+    const table = req.query.table;
+    if (!table || typeof table !== 'string') {
+        res.status(400).send('Invalid table name');
+        return;
+    }
+    const sql = `SHOW COLUMNS FROM ${mysql.escapeId(table)}`;
+    connection.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching columns:', err);
+            res.status(500).send('Error fetching columns');
+            return;
+        }
+        res.json({ columns: results, success: true });
+    });
+});
+
+// Read rows from a table
+app.get('/api/rows', (req, res) => {
+    const table = req.query.table;
+    if (!table || typeof table !== 'string') {
+        res.status(400).send('Invalid table name');
+        return;
+    }
+    const sql = `SELECT * FROM ${mysql.escapeId(table)}`;
+    connection.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching rows:', err);
+            res.status(500).send('Error fetching rows');
+            return;
+        }
+        res.json({ rows: results, success: true });
+    });
+});
+
+// Create a new row
+app.post('/api/rows', (req, res) => {
+    const { table, data } = req.body;
+    if (!table || typeof table !== 'string' || typeof data !== 'object') {
+        res.status(400).send('Invalid input');
+        return;
+    }
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+        res.status(400).send('No data provided');
+        return;
+    }
+    const cols = keys.map(k => mysql.escapeId(k)).join(', ');
+    const placeholders = keys.map(_ => '?').join(', ');
+    const values = keys.map(k => data[k]);
+    const sql = `INSERT INTO ${mysql.escapeId(table)} (${cols}) VALUES (${placeholders})`;
+    connection.query(sql, values, (err, results) => {
+        if (err) {
+            console.error('Error inserting row:', err);
+            res.status(500).send('Error inserting row');
+            return;
+        }
+        res.json({ insertId: results.insertId, success: true });
+    });
+});
+
+// Update a row by id (assumes primary key column is named `id`)
+app.put('/api/rows/:id', (req, res) => {
+    const id = req.params.id;
+    const { table, data } = req.body;
+    if (!table || typeof table !== 'string' || typeof data !== 'object') {
+        res.status(400).send('Invalid input');
+        return;
+    }
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+        res.status(400).send('No data provided');
+        return;
+    }
+    const setClause = keys.map(k => `${mysql.escapeId(k)} = ?`).join(', ');
+    const values = keys.map(k => data[k]);
+    values.push(id);
+    const sql = `UPDATE ${mysql.escapeId(table)} SET ${setClause} WHERE id = ?`;
+    connection.query(sql, values, (err, results) => {
+        if (err) {
+            console.error('Error updating row:', err);
+            res.status(500).send('Error updating row');
+            return;
+        }
+        res.json({ affectedRows: results.affectedRows, success: true });
+    });
+});
+
+// Delete a row by id (table passed as query param)
+app.delete('/api/rows/:id', (req, res) => {
+    const id = req.params.id;
+    const table = req.query.table;
+    if (!table || typeof table !== 'string') {
+        res.status(400).send('Invalid table name');
+        return;
+    }
+    const sql = `DELETE FROM ${mysql.escapeId(table)} WHERE id = ?`;
+    connection.query(sql, [id], (err, results) => {
+        if (err) {
+            console.error('Error deleting row:', err);
+            res.status(500).send('Error deleting row');
+            return;
+        }
+        res.json({ affectedRows: results.affectedRows, success: true });
+    });
+});
