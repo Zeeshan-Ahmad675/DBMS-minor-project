@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Table Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        padding: 20px;
+      }
+      .controls {
+        margin-bottom: 20px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      table,
+      th,
+      td {
+        border: 1px solid #ccc;
+      }
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+      }
+      .actions button {
+        margin-right: 6px;
+      }
+      form input,
+      form select {
+        padding: 6px;
+        margin-right: 8px;
+      }
+      #message {
+        margin: 10px 0;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">Table Data</h1>
+    <div class="controls">
+      <button id="back-to-tables">Back to Tables</button>
+      <span id="message"></span>
+    </div>
+
+    <div id="form-area">
+      <form id="row-form">
+        <div id="form-fields"></div>
+        <input type="hidden" id="editing-id" />
+        <button type="submit" id="submit-btn">Add Row</button>
+        <button type="button" id="cancel-btn" style="display: none">
+          Cancel
+        </button>
+      </form>
+    </div>
+
+    <h2>Rows</h2>
+    <div id="table-area">
+      <table id="rows-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+    <script>
+      const BACKEND_URL = "http://localhost:8000";
+
+      async function showMessage(msg, isError = false) {
+        const el = document.getElementById("message");
+        el.style.color = isError ? "red" : "green";
+        el.textContent = msg;
+        setTimeout(() => {
+          el.textContent = "";
+        }, 3000);
+      }
+
+      async function ensureDbSelected(dbName) {
+        try {
+          await axios.post(`${BACKEND_URL}/api/usedb`, { dbName });
+          return true;
+        } catch (err) {
+          console.error("Error selecting DB:", err);
+          showMessage("Failed to select database on server", true);
+          return false;
+        }
+      }
+
+      async function fetchColumns(table) {
+        const res = await axios.get(`${BACKEND_URL}/api/columns`, {
+          params: { table },
+        });
+        return res.data.columns;
+      }
+
+      async function fetchRows(table) {
+        const res = await axios.get(`${BACKEND_URL}/api/rows`, {
+          params: { table },
+        });
+        return res.data.rows;
+      }
+
+      function buildForm(columns) {
+        const formFields = document.getElementById("form-fields");
+        formFields.innerHTML = "";
+        // we won't render auto-increment primary keys for input
+        columns.forEach((col) => {
+          const name = col.Field;
+          const extra = col.Extra || "";
+          const key = col.Key || "";
+          if (key === "PRI" && extra.includes("auto_increment")) return; // skip auto PK
+          const wrapper = document.createElement("div");
+          wrapper.style.display = "inline-block";
+          wrapper.style.marginRight = "8px";
+          const input = document.createElement("input");
+          input.name = name;
+          input.id = `field-${name}`;
+          input.placeholder = name;
+          // choose type roughly by SQL type
+          const type = col.Type || "";
+          if (
+            type.startsWith("int") ||
+            type.startsWith("tinyint") ||
+            type.startsWith("bigint")
+          ) {
+            input.type = "number";
+          } else if (type.includes("text")) {
+            input.type = "text";
+          } else if (type.includes("char") || type.includes("varchar")) {
+            input.type = "text";
+          } else if (type.includes("date")) {
+            input.type = "date";
+          } else {
+            input.type = "text";
+          }
+          wrapper.appendChild(input);
+          formFields.appendChild(wrapper);
+        });
+      }
+
+      function renderTable(columns, rows) {
+        const thead = document.getElementById("table-head");
+        const tbody = document.getElementById("table-body");
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+        const tr = document.createElement("tr");
+        columns.forEach((col) => {
+          const th = document.createElement("th");
+          th.textContent = col.Field;
+          tr.appendChild(th);
+        });
+        const actionsTh = document.createElement("th");
+        actionsTh.textContent = "Actions";
+        tr.appendChild(actionsTh);
+        thead.appendChild(tr);
+
+        rows.forEach((row) => {
+          const r = document.createElement("tr");
+          columns.forEach((col) => {
+            const td = document.createElement("td");
+            const val = row[col.Field];
+            td.textContent = val === null || val === undefined ? "" : val;
+            r.appendChild(td);
+          });
+          const actionsTd = document.createElement("td");
+          actionsTd.className = "actions";
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "Edit";
+          editBtn.onclick = () => startEdit(row);
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Delete";
+          delBtn.onclick = () => deleteRow(row);
+          actionsTd.appendChild(editBtn);
+          actionsTd.appendChild(delBtn);
+          r.appendChild(actionsTd);
+          tbody.appendChild(r);
+        });
+      }
+
+      let CURRENT_TABLE = null;
+      let COLUMNS = [];
+
+      async function loadPage() {
+        const dbName = window.sessionStorage.getItem("dbName");
+        const table = window.sessionStorage.getItem("current_table");
+        if (!dbName) {
+          window.location.href = "index.html";
+          return;
+        }
+        if (!table) {
+          window.location.href = "tables.html";
+          return;
+        }
+        CURRENT_TABLE = table;
+        document.getElementById(
+          "title"
+        ).textContent = `Table: ${table} (DB: ${dbName})`;
+
+        const ok = await ensureDbSelected(dbName);
+        if (!ok) return;
+
+        try {
+          COLUMNS = await fetchColumns(table);
+          buildForm(COLUMNS);
+          await refreshRows();
+        } catch (err) {
+          console.error(err);
+          showMessage("Failed to load table metadata or rows", true);
+        }
+      }
+
+      async function refreshRows() {
+        const rows = await fetchRows(CURRENT_TABLE);
+        renderTable(COLUMNS, rows);
+      }
+
+      async function startEdit(row) {
+        // populate inputs
+        document.getElementById("editing-id").value = row.id || "";
+        COLUMNS.forEach((col) => {
+          const name = col.Field;
+          const key = col.Key || "";
+          const extra = col.Extra || "";
+          if (key === "PRI" && extra.includes("auto_increment")) return; // skipped field
+          const input = document.getElementById(`field-${name}`);
+          if (input) input.value = row[name] ?? "";
+        });
+        document.getElementById("submit-btn").textContent = "Update Row";
+        document.getElementById("cancel-btn").style.display = "inline-block";
+      }
+
+      function clearForm() {
+        document.getElementById("editing-id").value = "";
+        COLUMNS.forEach((col) => {
+          const name = col.Field;
+          const key = col.Key || "";
+          const extra = col.Extra || "";
+          if (key === "PRI" && extra.includes("auto_increment")) return;
+          const input = document.getElementById(`field-${name}`);
+          if (input) input.value = "";
+        });
+        document.getElementById("submit-btn").textContent = "Add Row";
+        document.getElementById("cancel-btn").style.display = "none";
+      }
+
+      async function deleteRow(row) {
+        const id = row.id;
+        if (id === undefined) {
+          showMessage("No id column found for this row; cannot delete", true);
+          return;
+        }
+        if (!confirm("Delete this row?")) return;
+        try {
+          await axios.delete(
+            `${BACKEND_URL}/api/rows/${encodeURIComponent(id)}`,
+            { params: { table: CURRENT_TABLE } }
+          );
+          showMessage("Row deleted");
+          await refreshRows();
+        } catch (err) {
+          console.error(err);
+          showMessage("Failed to delete row", true);
+        }
+      }
+
+      async function onSubmit(e) {
+        e.preventDefault();
+        const editingId = document.getElementById("editing-id").value;
+        const data = {};
+        COLUMNS.forEach((col) => {
+          const name = col.Field;
+          const key = col.Key || "";
+          const extra = col.Extra || "";
+          if (key === "PRI" && extra.includes("auto_increment")) return;
+          const input = document.getElementById(`field-${name}`);
+          if (!input) return;
+          let val = input.value;
+          if (val === "") val = null;
+          data[name] = val;
+        });
+        try {
+          if (editingId) {
+            await axios.put(
+              `${BACKEND_URL}/api/rows/${encodeURIComponent(editingId)}`,
+              { table: CURRENT_TABLE, data }
+            );
+            showMessage("Row updated");
+          } else {
+            await axios.post(`${BACKEND_URL}/api/rows`, {
+              table: CURRENT_TABLE,
+              data,
+            });
+            showMessage("Row created");
+          }
+          clearForm();
+          await refreshRows();
+        } catch (err) {
+          console.error(err);
+          showMessage("Operation failed", true);
+        }
+      }
+
+      async function onCancel() {
+        clearForm();
+      }
+
+      document.getElementById("row-form").addEventListener("submit", onSubmit);
+      document.getElementById("cancel-btn").addEventListener("click", onCancel);
+      document
+        .getElementById("back-to-tables")
+        .addEventListener("click", () => {
+          window.location.href = "tables.html";
+        });
+
+      // init
+      loadPage();
+    </script>
+  </body>
+</html>
