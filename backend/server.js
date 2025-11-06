@@ -118,6 +118,7 @@ app.post('/api/createtable', (req, res) => {
         return parts.map(p => mysql.escapeId(p)).join('.');
     };
 
+    let idx = 0;
     const columnDefinitions = fields.map((field) => {
         if (typeof field === 'string') {
             return field;
@@ -128,8 +129,8 @@ app.post('/api/createtable', (req, res) => {
         // const autoInc = field.autoIncrement ? 'AUTO_INCREMENT' : '';
         // const primary = field.primary ? 'PRIMARY KEY' : '';
         // const defaultClause = field.default !== undefined ? 'DEFAULT ' + mysql.escape(field.default) : '';
-
-        return [name, type].filter(Boolean).join(' ').trim();
+        if(idx++ === 0) return [name, type, 'AUTO_INCREMENT', 'PRIMARY KEY'].filter(Boolean).join(' ');
+        else return [name, type].filter(Boolean).join(' ').trim();
     }).join(', ');
 
     const query = `CREATE TABLE ${escapeQualifiedId(tName)} (
@@ -147,9 +148,21 @@ app.post('/api/createtable', (req, res) => {
 });
 
 
-const port = 8000;
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+app.post('/api/droptable', (req, res) => {
+    const { tableName } = req.body;
+    if (!tableName || typeof tableName !== 'string') {
+        res.status(400).send('Invalid table name');
+        return;
+    }
+    const query = `DROP TABLE IF EXISTS ${tableName}`;
+    connection.query(query, (err, results) => {
+        if (err) {
+            console.error('Error fetching columns:', err);
+            res.status(500).send('Error fetching columns');
+            return;
+        }
+        res.json({ success: true });
+    });
 });
 
 // Get columns for a table
@@ -217,7 +230,7 @@ app.post('/api/rows', (req, res) => {
 // Update a row by id (assumes primary key column is named `id`)
 app.put('/api/rows/:id', (req, res) => {
     const id = req.params.id;
-    const { table, data } = req.body;
+    const { table, data, pk } = req.body;
     if (!table || typeof table !== 'string' || typeof data !== 'object') {
         res.status(400).send('Invalid input');
         return;
@@ -230,7 +243,7 @@ app.put('/api/rows/:id', (req, res) => {
     const setClause = keys.map(k => `${mysql.escapeId(k)} = ?`).join(', ');
     const values = keys.map(k => data[k]);
     values.push(id);
-    const sql = `UPDATE ${mysql.escapeId(table)} SET ${setClause} WHERE id = ?`;
+    const sql = `UPDATE ${mysql.escapeId(table)} SET ${setClause} WHERE ${mysql.escapeId(pk)} = ?`;
     connection.query(sql, values, (err, results) => {
         if (err) {
             console.error('Error updating row:', err);
@@ -245,11 +258,12 @@ app.put('/api/rows/:id', (req, res) => {
 app.delete('/api/rows/:id', (req, res) => {
     const id = req.params.id;
     const table = req.query.table;
+    const pk = req.query.pk;
     if (!table || typeof table !== 'string') {
         res.status(400).send('Invalid table name');
         return;
     }
-    const sql = `DELETE FROM ${mysql.escapeId(table)} WHERE id = ?`;
+    const sql = `DELETE FROM ${mysql.escapeId(table)} WHERE ${mysql.escapeId(pk)} = ?`;
     connection.query(sql, [id], (err, results) => {
         if (err) {
             console.error('Error deleting row:', err);
@@ -258,4 +272,10 @@ app.delete('/api/rows/:id', (req, res) => {
         }
         res.json({ affectedRows: results.affectedRows, success: true });
     });
+});
+
+
+const port = 8000;
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
 });

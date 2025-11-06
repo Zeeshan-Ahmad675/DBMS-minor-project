@@ -36,7 +36,7 @@
                         res.data.tableNames.forEach((item) => {
                             // console.log(item);
                             const li = document.createElement('li');
-                            li.innerHTML = `<a href="table_data.html" class="tables">${item}</a>`;
+                            li.innerHTML = `<a href="table_data.html" class="tables">${item}</a> <button class="drop-table" style="margin-left: 5px;">Drop table</button>`;
                             etableNames.appendChild(li);
                         })
                         if(res.data.tableNames.length < 4){
@@ -65,6 +65,44 @@
             const tableName = a.textContent.trim();
             window.sessionStorage.setItem('current_table', tableName);
             window.location.href = 'table_data.html';
+        });
+
+        document.getElementById('table-names').addEventListener('click', async (e) => {
+            const dropBtn = e.target.closest('button.drop-table');
+            if (!dropBtn) return;
+            e.preventDefault();
+
+            const li = dropBtn.closest('li');
+            const a = li ? li.querySelector('a.tables') : null;
+            const tableName = a ? a.textContent.trim() : null;
+            if (!tableName) return;
+
+            if (!confirm(`Do you really want to drop the "${tableName}" table?`)) return;
+
+            try {
+                const dbName = window.sessionStorage.getItem('dbName');
+                const res = await axios.post(`${BACKEND_URL}/api/droptable`, { tableName });
+
+                if (res.data && res.data.success) {
+                    // remove the list item from DOM
+                    li.remove();
+
+                    // update stored tables list if present
+                    const stored = JSON.parse(window.sessionStorage.getItem('tables') || '[]');
+                    stored.push(tableName);
+                    window.sessionStorage.setItem('tables', JSON.stringify(stored));
+
+                    alert(`Table "${tableName}" dropped successfully.`);
+                    if (document.querySelectorAll('#table-names li').length === 0) {
+                        window.location.href = 'new_table.html';
+                    }
+                } else {
+                    alert(res.data && res.data.message ? res.data.message : 'Failed to drop table.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error dropping table. See console for details.');
+            }
         });
     </script>
 </body>
