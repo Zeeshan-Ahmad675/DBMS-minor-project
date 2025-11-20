@@ -230,6 +230,7 @@
                     }
                     const tName = etableNames.value;
                     try{
+                        await axios.post(`${BACKEND_URL}/api/usedb`, {dbName: dbName});
                         const res = await axios.post(`${BACKEND_URL}/api/createtable`, { tName: tName, fields: fields });
                         if(res.data.success){
                             window.location.href = "tables.html";

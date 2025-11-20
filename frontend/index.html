@@ -46,7 +46,6 @@
                 return;
             }
             currentDatabase = dbName;
-            // Yahan aap backend ko DB aur schema create karne ka request bhejenge
             console.log(`Creating database '${dbName}' with default schemas.`);
             try{
                 const res = await axios.post(`${BACKEND_URL}/api/createdb`, {dbName: dbName})

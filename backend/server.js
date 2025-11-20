@@ -111,7 +111,6 @@ app.post('/api/createtable', (req, res) => {
         return;
     }
 
-    // helper to safely escape qualified identifiers like "db.table" or "db.table.column"
     const escapeQualifiedId = (ident) => {
         if (typeof ident !== 'string') return '';
         const parts = ident.split('.');
@@ -125,10 +124,6 @@ app.post('/api/createtable', (req, res) => {
         }
         const name = escapeQualifiedId(field.name);
         const type = field.type ? String(field.type) : 'VARCHAR(255)';
-        // const nullable = field.nullable === false ? 'NOT NULL' : '';
-        // const autoInc = field.autoIncrement ? 'AUTO_INCREMENT' : '';
-        // const primary = field.primary ? 'PRIMARY KEY' : '';
-        // const defaultClause = field.default !== undefined ? 'DEFAULT ' + mysql.escape(field.default) : '';
         if(idx++ === 0) return [name, type, 'AUTO_INCREMENT', 'PRIMARY KEY'].filter(Boolean).join(' ');
         else return [name, type].filter(Boolean).join(' ').trim();
     }).join(', ');
@@ -254,7 +249,7 @@ app.put('/api/rows/:id', (req, res) => {
     });
 });
 
-// Delete a row by id (table passed as query param)
+// Delete a row by id
 app.delete('/api/rows/:id', (req, res) => {
     const id = req.params.id;
     const table = req.query.table;
